@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gelatinous Blob Simulation</title>
+    <meta name="description" content="Interactive 2D gelatinous blob simulation with physics-based absorption">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a1a;
+            overflow: hidden;
+            font-family: 'Outfit', sans-serif;
+            cursor: crosshair;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #ui-overlay {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #ui-overlay h1 {
+            font-size: 1.4rem;
+            font-weight: 300;
+            color: rgba(180, 220, 255, 0.6);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        #ui-overlay p {
+            font-size: 0.75rem;
+            color: rgba(140, 180, 220, 0.4);
+            letter-spacing: 0.1em;
+        }
+
+        #stats {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            font-size: 0.7rem;
+            color: rgba(140, 200, 255, 0.35);
+            pointer-events: none;
+            z-index: 10;
+            line-height: 1.6;
+        }
+
+        #toolbar {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(15, 20, 40, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(100, 180, 255, 0.12);
+            border-radius: 14px;
+            z-index: 20;
+            align-items: center;
+        }
+
+        .tool-btn {
+            padding: 6px 14px;
+            border: 1px solid rgba(100, 180, 255, 0.15);
+            border-radius: 8px;
+            background: rgba(30, 50, 80, 0.3);
+            color: rgba(160, 200, 240, 0.7);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.72rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            letter-spacing: 0.06em;
+            user-select: none;
+        }
+
+        .tool-btn:hover {
+            background: rgba(50, 80, 120, 0.4);
+            color: rgba(200, 230, 255, 0.9);
+        }
+
+        .tool-btn.active {
+            background: rgba(40, 180, 160, 0.25);
+            border-color: rgba(60, 255, 200, 0.5);
+            color: rgba(120, 255, 220, 0.95);
+            box-shadow: 0 0 12px rgba(40, 220, 180, 0.15);
+        }
+
+        .tool-sep {
+            width: 1px;
+            height: 20px;
+            background: rgba(100, 180, 255, 0.1);
+            margin: 0 4px;
+        }
+
+        .tool-key {
+            font-size: 0.6rem;
+            color: rgba(140, 180, 220, 0.35);
+            margin-left: 4px;
+            border: 1px solid rgba(140, 180, 220, 0.15);
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+
+        #subtool-bar {
+            position: fixed;
+            top: 128px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(15, 20, 40, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 180, 255, 0.08);
+            border-radius: 10px;
+            z-index: 20;
+        }
+
+        #subtool-bar.visible {
+            display: flex;
+        }
+
+        .subtool-btn {
+            padding: 5px 12px;
+            border: 1px solid rgba(100, 180, 255, 0.1);
+            border-radius: 6px;
+            background: rgba(30, 50, 80, 0.2);
+            color: rgba(160, 200, 240, 0.6);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .subtool-btn:hover {
+            background: rgba(50, 80, 120, 0.35);
+            color: rgba(200, 230, 255, 0.85);
+        }
+
+        .subtool-btn.active {
+            background: rgba(220, 160, 40, 0.2);
+            border-color: rgba(255, 200, 80, 0.45);
+            color: rgba(255, 220, 130, 0.95);
+        }
+
+        .subtool-btn.spike-active {
+            background: rgba(220, 50, 50, 0.2);
+            border-color: rgba(255, 80, 80, 0.45);
+            color: rgba(255, 120, 120, 0.95);
+        }
+
+        .subtool-btn.jump-active {
+            background: rgba(50, 180, 220, 0.2);
+            border-color: rgba(80, 220, 255, 0.45);
+            color: rgba(130, 240, 255, 0.95);
+        }
+
+        #tool-hint {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: rgba(140, 200, 255, 0.3);
+            pointer-events: none;
+            z-index: 10;
+            text-align: center;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="ui-overlay">
+        <h1>Gelatinous Blob</h1>
+        <p>Click to spawn objects · Drag to move the blob · Press keys to switch tools</p>
+    </div>
+    <div id="toolbar">
+        <button class="tool-btn active" data-tool="default" id="btn-default">🫧 Default <span
+                class="tool-key">Q</span></button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn" data-tool="attractor" id="btn-attractor">🌀 Attractor <span
+                class="tool-key">A</span></button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn" data-tool="builder" id="btn-builder">🔧 Builder <span
+                class="tool-key">B</span></button>
+        <div class="tool-sep"></div>
+        <button class="tool-btn" id="btn-reset">🔄 Reset Blob</button>
+    </div>
+    <div id="subtool-bar">
+        <button class="subtool-btn active" data-subtool="wall" id="btn-wall">▬ Wall <span
+                class="tool-key">1</span></button>
+        <button class="subtool-btn" data-subtool="spike" id="btn-spike">◆ Spike <span class="tool-key">2</span></button>
+    </div>
+    <div id="tool-hint"></div>
+    <div id="stats"></div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // ─── Canvas Setup ───────────────────────────────────────────
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let W, H;
+
+        function resize() {
+            W = canvas.width = window.innerWidth;
+            H = canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', resize);
+
+        // ─── Utilities ──────────────────────────────────────────────
+        function dist(a, b) {
+            const dx = a.x - b.x, dy = a.y - b.y;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+        // ─── Color Palette ──────────────────────────────────────────
+        const palette = {
+            blobCore: 'rgba(30, 200, 160, 0.12)',
+            blobEdge: 'rgba(60, 255, 200, 0.55)',
+            blobGlow: 'rgba(40, 220, 180, 0.08)',
+            pseudopod: 'rgba(80, 255, 210, 0.4)',
+            particle: (hue) => `hsla(${hue}, 85%, 65%, 0.9)`,
+            particleGlow: (hue) => `hsla(${hue}, 90%, 55%, 0.25)`,
+            trail: 'rgba(60, 255, 200, 0.03)',
+        };
+
+        // ─── Blob (Soft Body) ───────────────────────────────────────
+        const BLOB_POINTS = 128;
+        const BLOB_RADIUS = 120;
+        const SPRING_K = 0.018;
+        const DAMPING = 0.92;
+        const INTERNAL_PRESSURE = 0.0004;
+        const PSEUDOPOD_REACH = 200;
+        const PULL_RANGE = 280;
+        const PULL_STRENGTH = 0.35;
+        const ABSORB_DIST = 30;
+
+        class Blob {
+            constructor(x, y) {
+                this.cx = x;
+                this.cy = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.points = [];
+                this.absorbed = 0;
+                this.pulsePhase = 0;
+                this.mass = 1;
+
+                for (let i = 0; i < BLOB_POINTS; i++) {
+                    const angle = (i / BLOB_POINTS) * Math.PI * 2;
+                    this.points.push({
+                        x: x + Math.cos(angle) * BLOB_RADIUS,
+                        y: y + Math.sin(angle) * BLOB_RADIUS,
+                        vx: 0,
+                        vy: 0,
+                        restAngle: angle,
+                        restR: BLOB_RADIUS,
+                        extension: 0,
+                    });
+                }
+            }
+
+            update(particles, dt) {
+                this.pulsePhase += 0.02;
+
+                // Organic idle breathing
+                const breathe = Math.sin(this.pulsePhase) * 3;
+
+                // Center of mass from points
+                let avgX = 0, avgY = 0;
+                for (const p of this.points) { avgX += p.x; avgY += p.y; }
+                avgX /= this.points.length;
+                avgY /= this.points.length;
+                this.cx = avgX;
+                this.cy = avgY;
+
+                // Find the single nearest particle for pseudopod targeting
+                const pseudopodTargets = [];
+                let nearestDist = Infinity, nearestParticle = null;
+                for (const particle of particles) {
+                    if (particle.absorbed) continue;
+                    const d = dist(particle, { x: this.cx, y: this.cy });
+                    if (d < PULL_RANGE + this.getEffectiveRadius() && d < nearestDist) {
+                        nearestDist = d;
+                        nearestParticle = particle;
+                    }
+                }
+                if (nearestParticle) pseudopodTargets.push(nearestParticle);
+
+                // Whole-blob drift toward nearest particle
+                if (nearestParticle) {
+                    const dx = nearestParticle.x - this.cx;
+                    const dy = nearestParticle.y - this.cy;
+                    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const driftStrength = 0.12 * clamp(1 - d / (PULL_RANGE + this.getEffectiveRadius()), 0, 1);
+                    for (const p of this.points) {
+                        p.vx += (dx / d) * driftStrength;
+                        p.vy += (dy / d) * driftStrength;
+                    }
+                }
+
+                // Update each blob control point
+                for (let i = 0; i < this.points.length; i++) {
+                    const p = this.points[i];
+                    const angle = p.restAngle;
+                    const effectiveR = p.restR + breathe + Math.sin(this.pulsePhase * 1.7 + i * 0.15) * 2;
+
+                    // Rest position
+                    const restX = this.cx + Math.cos(angle) * effectiveR;
+                    const restY = this.cy + Math.sin(angle) * effectiveR;
+
+                    // Spring force toward rest
+                    let fx = (restX - p.x) * SPRING_K;
+                    let fy = (restY - p.y) * SPRING_K;
+
+                    // Pseudopod extension toward nearby particles
+                    let targetExtension = 0;
+                    for (const particle of pseudopodTargets) {
+                        const dx = particle.x - this.cx;
+                        const dy = particle.y - this.cy;
+                        const particleAngle = Math.atan2(dy, dx);
+
+                        // How well does this point align with the particle direction?
+                        let angleDiff = particleAngle - angle;
+                        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+                        // Wide, smooth falloff — cubic ease for organic bulge
+                        const rawAlign = 1 - Math.abs(angleDiff) / 1.5;
+                        const alignment = Math.max(0, rawAlign * rawAlign * rawAlign);
+                        if (alignment > 0) {
+                            const d = dist(particle, { x: this.cx, y: this.cy });
+                            const reach = clamp(1 - d / (PULL_RANGE + effectiveR), 0, 1);
+                            const ext = alignment * reach * PSEUDOPOD_REACH * 0.7;
+                            targetExtension = Math.max(targetExtension, ext);
+
+                            // Gentle directional pull on the point
+                            const pullDirX = Math.cos(particleAngle);
+                            const pullDirY = Math.sin(particleAngle);
+                            fx += pullDirX * alignment * reach * 0.15;
+                            fy += pullDirY * alignment * reach * 0.15;
+                        }
+                    }
+
+                    // Smooth extension — slow ease for organic feel
+                    p.extension = lerp(p.extension, targetExtension, 0.04);
+
+                    // Apply extension to rest target
+                    const extX = Math.cos(angle) * p.extension;
+                    const extY = Math.sin(angle) * p.extension;
+                    fx += (restX + extX - p.x) * 0.008;
+                    fy += (restY + extY - p.y) * 0.008;
+
+                    // Pressure – push points outward from center
+                    const toCenterDx = p.x - this.cx;
+                    const toCenterDy = p.y - this.cy;
+                    const toCenterDist = Math.sqrt(toCenterDx * toCenterDx + toCenterDy * toCenterDy) || 1;
+                    fx += (toCenterDx / toCenterDist) * INTERNAL_PRESSURE * effectiveR;
+                    fy += (toCenterDy / toCenterDist) * INTERNAL_PRESSURE * effectiveR;
+
+                    // Neighbor cohesion (keep blob shape)
+                    const prev = this.points[(i - 1 + this.points.length) % this.points.length];
+                    const next = this.points[(i + 1) % this.points.length];
+                    const idealSpacing = (2 * Math.PI * effectiveR) / this.points.length;
+
+                    for (const neighbor of [prev, next]) {
+                        const ndx = neighbor.x - p.x;
+                        const ndy = neighbor.y - p.y;
+                        const nd = Math.sqrt(ndx * ndx + ndy * ndy) || 1;
+                        const diff = nd - idealSpacing;
+                        fx += (ndx / nd) * diff * 0.005;
+                        fy += (ndy / nd) * diff * 0.005;
+                    }
+
+                    p.vx = (p.vx + fx) * DAMPING;
+                    p.vy = (p.vy + fy) * DAMPING;
+                    p.x += p.vx;
+                    p.y += p.vy;
+
+                    // Boundary: keep blob points on screen
+                    const margin = 5;
+                    if (p.x < margin) { p.x = margin; p.vx *= -0.5; }
+                    if (p.x > W - margin) { p.x = W - margin; p.vx *= -0.5; }
+                    if (p.y < margin) { p.y = margin; p.vy *= -0.5; }
+                    if (p.y > H - margin) { p.y = H - margin; p.vy *= -0.5; }
+                }
+
+                // Pull nearby particles toward blob center
+                for (const particle of pseudopodTargets) {
+                    const dx = this.cx - particle.x;
+                    const dy = this.cy - particle.y;
+                    const d = Math.sqrt(dx * dx + dy * dy) || 1;
+                    const effectiveRange = PULL_RANGE + this.getEffectiveRadius();
+
+                    if (d < effectiveRange) {
+                        const force = PULL_STRENGTH * Math.pow(1 - d / effectiveRange, 2);
+                        particle.vx += (dx / d) * force;
+                        particle.vy += (dy / d) * force;
+
+                        // Slow down the particle (viscosity)
+                        particle.vx *= 0.97;
+                        particle.vy *= 0.97;
+                    }
+
+                    // Absorb if close enough
+                    if (d < ABSORB_DIST) {
+                        particle.absorbed = true;
+                        particle.absorbTime = 0;
+                        this.absorbed++;
+                        // Grow slightly
+                        for (const p of this.points) {
+                            p.restR += 0.5;
+                        }
+                    }
+                }
+            }
+
+            getEffectiveRadius() {
+                let maxR = 0;
+                for (const p of this.points) {
+                    const d = dist(p, { x: this.cx, y: this.cy });
+                    maxR = Math.max(maxR, d);
+                }
+                return maxR;
+            }
+
+            draw(ctx) {
+                // Outer glow
+                const glowGrad = ctx.createRadialGradient(
+                    this.cx, this.cy, 0,
+                    this.cx, this.cy, this.getEffectiveRadius() + 100
+                );
+                glowGrad.addColorStop(0, 'rgba(40, 220, 180, 0.06)');
+                glowGrad.addColorStop(0.5, 'rgba(40, 220, 180, 0.02)');
+                glowGrad.addColorStop(1, 'rgba(40, 220, 180, 0)');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(this.cx, this.cy, this.getEffectiveRadius() + 100, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Main blob body using smooth curve through points
+                ctx.beginPath();
+                const pts = this.points;
+                ctx.moveTo(
+                    (pts[pts.length - 1].x + pts[0].x) / 2,
+                    (pts[pts.length - 1].y + pts[0].y) / 2
+                );
+                for (let i = 0; i < pts.length; i++) {
+                    const next = pts[(i + 1) % pts.length];
+                    const midX = (pts[i].x + next.x) / 2;
+                    const midY = (pts[i].y + next.y) / 2;
+                    ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+                }
+                ctx.closePath();
+
+                // Fill with gradient
+                const bodyGrad = ctx.createRadialGradient(
+                    this.cx, this.cy, 0,
+                    this.cx, this.cy, this.getEffectiveRadius()
+                );
+                bodyGrad.addColorStop(0, 'rgba(20, 180, 140, 0.25)');
+                bodyGrad.addColorStop(0.6, 'rgba(30, 200, 160, 0.15)');
+                bodyGrad.addColorStop(1, 'rgba(60, 255, 200, 0.08)');
+                ctx.fillStyle = bodyGrad;
+                ctx.fill();
+
+                // Edge glow
+                ctx.strokeStyle = palette.blobEdge;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Inner highlight (nucleus look)
+                const nucleusGrad = ctx.createRadialGradient(
+                    this.cx - 15, this.cy - 20, 5,
+                    this.cx, this.cy, this.getEffectiveRadius() * 0.5
+                );
+                nucleusGrad.addColorStop(0, 'rgba(100, 255, 220, 0.15)');
+                nucleusGrad.addColorStop(1, 'rgba(40, 200, 160, 0)');
+                ctx.fillStyle = nucleusGrad;
+                ctx.beginPath();
+                ctx.arc(this.cx, this.cy, this.getEffectiveRadius() * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Internal specks for texture
+                for (let i = 0; i < 12; i++) {
+                    const angle = this.pulsePhase * 0.3 + i * (Math.PI * 2 / 12);
+                    const r = 20 + Math.sin(this.pulsePhase + i) * 15;
+                    const sx = this.cx + Math.cos(angle) * r;
+                    const sy = this.cy + Math.sin(angle) * r;
+                    const speckR = 2 + Math.sin(this.pulsePhase * 2 + i * 1.3) * 1;
+                    ctx.fillStyle = 'rgba(100, 255, 220, 0.1)';
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, speckR, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        // ─── Small Particles ────────────────────────────────────────
+        class Particle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+                this.radius = 4 + Math.random() * 6;
+                this.hue = 180 + Math.random() * 120; // Cyan to purple range
+                this.phase = Math.random() * Math.PI * 2;
+                this.absorbed = false;
+                this.absorbTime = 0;
+                this.trail = [];
+                this.wobble = Math.random() * 0.02 + 0.01;
+            }
+
+            update() {
+                if (this.absorbed) {
+                    this.absorbTime += 0.05;
+                    return;
+                }
+
+                this.phase += this.wobble;
+
+                // Gentle wandering force
+                this.vx += Math.sin(this.phase) * 0.01;
+                this.vy += Math.cos(this.phase * 1.3) * 0.01;
+
+                // Speed limit
+                const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                if (speed > 2) {
+                    this.vx = (this.vx / speed) * 2;
+                    this.vy = (this.vy / speed) * 2;
+                }
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Bounce off edges
+                if (this.x < this.radius) { this.x = this.radius; this.vx *= -0.8; }
+                if (this.x > W - this.radius) { this.x = W - this.radius; this.vx *= -0.8; }
+                if (this.y < this.radius) { this.y = this.radius; this.vy *= -0.8; }
+                if (this.y > H - this.radius) { this.y = H - this.radius; this.vy *= -0.8; }
+
+                // Store trail
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 8) this.trail.shift();
+            }
+
+            draw(ctx) {
+                if (this.absorbed) {
+                    // Shrink and fade
+                    const alpha = Math.max(0, 1 - this.absorbTime);
+                    const r = this.radius * alpha;
+                    if (alpha <= 0) return;
+
+                    ctx.fillStyle = `hsla(${this.hue}, 85%, 65%, ${alpha * 0.5})`;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+                    return;
+                }
+
+                // Trail
+                for (let i = 0; i < this.trail.length; i++) {
+                    const t = this.trail[i];
+                    const alpha = (i / this.trail.length) * 0.15;
+                    ctx.fillStyle = `hsla(${this.hue}, 80%, 60%, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, this.radius * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Glow
+                const glowGrad = ctx.createRadialGradient(
+                    this.x, this.y, 0,
+                    this.x, this.y, this.radius * 3
+                );
+                glowGrad.addColorStop(0, palette.particleGlow(this.hue));
+                glowGrad.addColorStop(1, 'transparent');
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Core
+                const coreGrad = ctx.createRadialGradient(
+                    this.x - this.radius * 0.2, this.y - this.radius * 0.2, 0,
+                    this.x, this.y, this.radius
+                );
+                coreGrad.addColorStop(0, `hsla(${this.hue}, 90%, 80%, 0.95)`);
+                coreGrad.addColorStop(0.7, palette.particle(this.hue));
+                coreGrad.addColorStop(1, `hsla(${this.hue}, 80%, 45%, 0.6)`);
+                ctx.fillStyle = coreGrad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // ─── Attractor ──────────────────────────────────────────────
+        class Attractor {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = 18;
+                this.range = 220;
+                this.strength = 0.6;
+                this.phase = Math.random() * Math.PI * 2;
+            }
+            update() { this.phase += 0.03; }
+            affect(obj) {
+                const dx = this.x - obj.x, dy = this.y - obj.y;
+                const d = Math.sqrt(dx * dx + dy * dy) || 1;
+                if (d < this.range && d > this.radius) {
+                    const f = this.strength * Math.pow(1 - d / this.range, 1.5);
+                    obj.vx += (dx / d) * f;
+                    obj.vy += (dy / d) * f;
+                }
+            }
+            affectBlob(blob) {
+                for (const p of blob.points) this.affect(p);
+            }
+            draw(ctx) {
+                // Range ring
+                const pulseR = this.range + Math.sin(this.phase * 2) * 8;
+                ctx.beginPath(); ctx.arc(this.x, this.y, pulseR, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(180, 100, 255, 0.08)'; ctx.lineWidth = 1; ctx.stroke();
+                // Spiral lines
+                for (let i = 0; i < 3; i++) {
+                    const a = this.phase + i * (Math.PI * 2 / 3);
+                    const r1 = this.radius + 8, r2 = this.range * 0.6;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + Math.cos(a) * r1, this.y + Math.sin(a) * r1);
+                    const midA = a + 0.5;
+                    ctx.quadraticCurveTo(
+                        this.x + Math.cos(midA) * (r1 + r2) * 0.5,
+                        this.y + Math.sin(midA) * (r1 + r2) * 0.5,
+                        this.x + Math.cos(a + 1) * r2, this.y + Math.sin(a + 1) * r2
+                    );
+                    ctx.strokeStyle = `rgba(180, 100, 255, ${0.15 + Math.sin(this.phase + i) * 0.05})`;
+                    ctx.lineWidth = 1.5; ctx.stroke();
+                }
+                // Core glow
+                const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 3);
+                g.addColorStop(0, 'rgba(160, 80, 255, 0.3)'); g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2); ctx.fill();
+                // Core
+                const cg = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                cg.addColorStop(0, 'rgba(200, 140, 255, 0.9)'); cg.addColorStop(0.7, 'rgba(140, 60, 220, 0.6)'); cg.addColorStop(1, 'rgba(100, 30, 180, 0.3)');
+                ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        // ─── Wall ───────────────────────────────────────────────────
+        class Wall {
+            constructor(x1, y1, x2, y2) {
+                this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2;
+                this.thickness = 6;
+            }
+            collide(obj, radius) {
+                const dx = this.x2 - this.x1, dy = this.y2 - this.y1;
+                const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                const nx = -dy / len, ny = dx / len; // normal
+                const relX = obj.x - this.x1, relY = obj.y - this.y1;
+                const proj = (relX * dx + relY * dy) / (len * len);
+                if (proj < 0 || proj > 1) return;
+                const closestX = this.x1 + dx * proj, closestY = this.y1 + dy * proj;
+                const distX = obj.x - closestX, distY = obj.y - closestY;
+                const d = Math.sqrt(distX * distX + distY * distY);
+                const minDist = radius + this.thickness;
+                if (d < minDist && d > 0) {
+                    const push = (minDist - d);
+                    obj.x += (distX / d) * push;
+                    obj.y += (distY / d) * push;
+                    // Reflect velocity
+                    const dot = obj.vx * (distX / d) + obj.vy * (distY / d);
+                    if (dot < 0) {
+                        obj.vx -= 2 * dot * (distX / d) * 0.7;
+                        obj.vy -= 2 * dot * (distY / d) * 0.7;
+                    }
+                }
+            }
+            draw(ctx) {
+                // Glow
+                ctx.beginPath(); ctx.moveTo(this.x1, this.y1); ctx.lineTo(this.x2, this.y2);
+                ctx.strokeStyle = 'rgba(255, 200, 80, 0.08)'; ctx.lineWidth = this.thickness + 12; ctx.lineCap = 'round'; ctx.stroke();
+                // Core
+                ctx.beginPath(); ctx.moveTo(this.x1, this.y1); ctx.lineTo(this.x2, this.y2);
+                ctx.strokeStyle = 'rgba(255, 200, 80, 0.5)'; ctx.lineWidth = this.thickness; ctx.lineCap = 'round'; ctx.stroke();
+                // Bright edge
+                ctx.beginPath(); ctx.moveTo(this.x1, this.y1); ctx.lineTo(this.x2, this.y2);
+                ctx.strokeStyle = 'rgba(255, 230, 150, 0.7)'; ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.stroke();
+                // End caps
+                for (const [x, y] of [[this.x1, this.y1], [this.x2, this.y2]]) {
+                    ctx.fillStyle = 'rgba(255, 220, 120, 0.6)'; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+                }
+            }
+        }
+
+        // ─── Spike ──────────────────────────────────────────────────
+        class Spike {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = 14;
+                this.spikes = 6 + Math.floor(Math.random() * 3);
+                this.phase = Math.random() * Math.PI * 2;
+                this.damage = 3; // shrinks blob
+            }
+            update() { this.phase += 0.015; }
+            hitBlob(blob) {
+                let hit = false;
+                for (const p of blob.points) {
+                    const dx = p.x - this.x, dy = p.y - this.y;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < this.radius + 8) {
+                        // Push point away and shrink blob
+                        const pushF = 3;
+                        p.vx += (dx / d) * pushF;
+                        p.vy += (dy / d) * pushF;
+                        if (p.restR > 50) p.restR -= 0.15;
+                        hit = true;
+                    }
+                }
+                return hit;
+            }
+            hitParticle(particle) {
+                const d = dist(particle, this);
+                if (d < this.radius + particle.radius) {
+                    particle.absorbed = true; particle.absorbTime = 0;
+                    return true;
+                }
+                return false;
+            }
+            draw(ctx) {
+                // Glow
+                const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 3);
+                g.addColorStop(0, 'rgba(255, 50, 50, 0.15)'); g.addColorStop(1, 'transparent');
+                ctx.fillStyle = g; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 3, 0, Math.PI * 2); ctx.fill();
+                // Spike shape
+                ctx.beginPath();
+                for (let i = 0; i < this.spikes * 2; i++) {
+                    const a = (i / (this.spikes * 2)) * Math.PI * 2 + this.phase;
+                    const r = i % 2 === 0 ? this.radius + 8 + Math.sin(this.phase * 3 + i) * 2 : this.radius * 0.5;
+                    const sx = this.x + Math.cos(a) * r, sy = this.y + Math.sin(a) * r;
+                    i === 0 ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(255, 60, 60, 0.35)';
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 100, 80, 0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+                // Inner core
+                ctx.fillStyle = 'rgba(255, 120, 100, 0.5)'; ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * 0.4, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+
+        // ─── Tendrils (visual connection lines) ─────────────────────
+        function drawTendrils(ctx, blob, particles) {
+            for (const particle of particles) {
+                if (particle.absorbed) continue;
+                const d = dist(particle, { x: blob.cx, y: blob.cy });
+                const range = PULL_RANGE + blob.getEffectiveRadius();
+
+                if (d < range) {
+                    const intensity = Math.pow(1 - d / range, 2);
+
+                    // Find nearest blob surface point
+                    let minD = Infinity, nearestP = blob.points[0];
+                    for (const bp of blob.points) {
+                        const bd = dist(bp, particle);
+                        if (bd < minD) { minD = bd; nearestP = bp; }
+                    }
+
+                    // Draw tendril as bezier curve
+                    ctx.beginPath();
+                    const midX = (nearestP.x + particle.x) / 2 + Math.sin(blob.pulsePhase * 3) * 10;
+                    const midY = (nearestP.y + particle.y) / 2 + Math.cos(blob.pulsePhase * 2.5) * 10;
+                    ctx.moveTo(nearestP.x, nearestP.y);
+                    ctx.quadraticCurveTo(midX, midY, particle.x, particle.y);
+                    ctx.strokeStyle = `rgba(60, 255, 200, ${intensity * 0.25})`;
+                    ctx.lineWidth = 1 + intensity * 2;
+                    ctx.stroke();
+
+                    // Pulsing ring around affected particle
+                    const ringR = particle.radius + 4 + Math.sin(blob.pulsePhase * 4) * 2;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, ringR, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(60, 255, 200, ${intensity * 0.3})`;
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // ─── Background Particles (ambient) ─────────────────────────
+        const bgParticles = [];
+        for (let i = 0; i < 80; i++) {
+            bgParticles.push({
+                x: Math.random() * 2000,
+                y: Math.random() * 2000,
+                r: Math.random() * 1.5 + 0.3,
+                speed: Math.random() * 0.3 + 0.05,
+                angle: Math.random() * Math.PI * 2,
+                alpha: Math.random() * 0.15 + 0.03,
+            });
+        }
+
+        function drawBackground(ctx) {
+            // Deep space gradient
+            const bg = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.7);
+            bg.addColorStop(0, '#0d1020');
+            bg.addColorStop(0.5, '#0a0a18');
+            bg.addColorStop(1, '#060610');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+
+            // Ambient floating specks
+            for (const bp of bgParticles) {
+                bp.x += Math.cos(bp.angle) * bp.speed;
+                bp.y += Math.sin(bp.angle) * bp.speed;
+                bp.angle += (Math.random() - 0.5) * 0.02;
+
+                if (bp.x < -20) bp.x = W + 20;
+                if (bp.x > W + 20) bp.x = -20;
+                if (bp.y < -20) bp.y = H + 20;
+                if (bp.y > H + 20) bp.y = -20;
+
+                ctx.fillStyle = `rgba(100, 180, 220, ${bp.alpha})`;
+                ctx.beginPath();
+                ctx.arc(bp.x, bp.y, bp.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // ─── Scene Setup ────────────────────────────────────────────
+        const blob = new Blob(W / 2, H / 2);
+        let particles = [];
+        let attractors = [];
+        let walls = [];
+
+        let spikes = [];
+
+        // Tool state
+        let currentTool = 'default'; // 'default', 'attractor', 'builder'
+        let currentSubtool = 'wall'; // 'wall', 'spike'
+        let wallStart = null; // for wall drag-drawing
+        const toolHintEl = document.getElementById('tool-hint');
+        const subtoolBar = document.getElementById('subtool-bar');
+
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[data-tool="${tool}"]`).classList.add('active');
+            subtoolBar.classList.toggle('visible', tool === 'builder');
+            updateHint();
+        }
+        function setSubtool(sub) {
+            currentSubtool = sub;
+            document.querySelectorAll('.subtool-btn').forEach(b => {
+                b.classList.remove('active', 'spike-active', 'jump-active');
+            });
+            const btn = document.querySelector(`[data-subtool="${sub}"]`);
+            if (sub === 'spike') btn.classList.add('spike-active');
+
+            else btn.classList.add('active');
+            updateHint();
+        }
+        function updateHint() {
+            const hints = {
+                default: 'Click to spawn particles · Drag blob to move it · X to delete nearest object',
+                attractor: 'Click to place an attractor gravity well · X to delete nearest',
+                builder: {
+                    wall: 'Click & drag to draw a wall barrier · X to delete nearest',
+                    spike: 'Click to place a spike hazard · X to delete nearest',
+                }
+            };
+            toolHintEl.textContent = currentTool === 'builder' ? hints.builder[currentSubtool] : hints[currentTool];
+        }
+        updateHint();
+
+        // Toolbar click handlers
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); setTool(btn.dataset.tool); });
+        });
+        document.querySelectorAll('.subtool-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => { e.stopPropagation(); setSubtool(btn.dataset.subtool); });
+        });
+
+        // Reset blob button
+        document.getElementById('btn-reset').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const cx = W / 2, cy = H / 2;
+            blob.absorbed = 0;
+            blob.pulsePhase = 0;
+            for (let i = 0; i < blob.points.length; i++) {
+                const angle = (i / blob.points.length) * Math.PI * 2;
+                blob.points[i].x = cx + Math.cos(angle) * BLOB_RADIUS;
+                blob.points[i].y = cy + Math.sin(angle) * BLOB_RADIUS;
+                blob.points[i].vx = 0;
+                blob.points[i].vy = 0;
+                blob.points[i].restR = BLOB_RADIUS;
+                blob.points[i].extension = 0;
+            }
+        });
+
+        // Keyboard shortcuts
+        window.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            if (key === 'q') setTool('default');
+            else if (key === 'a') setTool('attractor');
+            else if (key === 'b') setTool('builder');
+            else if (key === '1') { setTool('builder'); setSubtool('wall'); }
+            else if (key === '2') { setTool('builder'); setSubtool('spike'); }
+            else if (key === 'x') deleteNearest(mouse.x, mouse.y);
+        });
+
+        function deleteNearest(mx, my) {
+            let best = 80, bestArr = null, bestIdx = -1; // 80px threshold
+            const check = (arr, getPos) => {
+                arr.forEach((obj, i) => {
+                    const d = dist({ x: mx, y: my }, getPos(obj));
+                    if (d < best) { best = d; bestArr = arr; bestIdx = i; }
+                });
+            };
+            check(attractors, o => o);
+            check(walls, o => ({ x: (o.x1 + o.x2) / 2, y: (o.y1 + o.y2) / 2 }));
+
+            check(spikes, o => o);
+            if (bestArr && bestIdx >= 0) bestArr.splice(bestIdx, 1);
+        }
+
+        // Spawn initial particles
+        function spawnInitialParticles() {
+            for (let i = 0; i < 20; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const r = 250 + Math.random() * 300;
+                particles.push(new Particle(
+                    W / 2 + Math.cos(angle) * r,
+                    H / 2 + Math.sin(angle) * r
+                ));
+            }
+        }
+        spawnInitialParticles();
+
+        // ─── Mouse Interaction ──────────────────────────────────────
+        let mouse = { x: W / 2, y: H / 2, down: false, dragging: false };
+
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+
+            if (mouse.down && mouse.dragging) {
+                const dx = mouse.x - blob.cx;
+                const dy = mouse.y - blob.cy;
+                for (const p of blob.points) {
+                    p.x += dx * 0.05;
+                    p.y += dy * 0.05;
+                }
+            }
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (e.target !== canvas) return;
+            mouse.down = true;
+
+            if (currentTool === 'default') {
+                const d = dist({ x: e.clientX, y: e.clientY }, { x: blob.cx, y: blob.cy });
+                if (d < blob.getEffectiveRadius() + 30) {
+                    mouse.dragging = true;
+                }
+            } else if (currentTool === 'builder' && currentSubtool === 'wall') {
+                wallStart = { x: e.clientX, y: e.clientY };
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (currentTool === 'default') {
+                if (!mouse.dragging) particles.push(new Particle(e.clientX, e.clientY));
+            } else if (currentTool === 'attractor') {
+                attractors.push(new Attractor(e.clientX, e.clientY));
+            } else if (currentTool === 'builder') {
+                if (currentSubtool === 'wall' && wallStart) {
+                    const dx = e.clientX - wallStart.x, dy = e.clientY - wallStart.y;
+                    if (Math.sqrt(dx * dx + dy * dy) > 20) {
+                        walls.push(new Wall(wallStart.x, wallStart.y, e.clientX, e.clientY));
+                    }
+                } else if (currentSubtool === 'spike') {
+                    spikes.push(new Spike(e.clientX, e.clientY));
+                }
+            }
+            mouse.down = false;
+            mouse.dragging = false;
+            wallStart = null;
+        });
+
+        // Touch support
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mouse.x = touch.clientX;
+            mouse.y = touch.clientY;
+            mouse.down = true;
+            if (currentTool === 'default') {
+                const d = dist({ x: touch.clientX, y: touch.clientY }, { x: blob.cx, y: blob.cy });
+                if (d < blob.getEffectiveRadius() + 30) mouse.dragging = true;
+            } else if (currentTool === 'builder' && currentSubtool === 'wall') {
+                wallStart = { x: touch.clientX, y: touch.clientY };
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            mouse.x = touch.clientX;
+            mouse.y = touch.clientY;
+            if (mouse.dragging) {
+                const dx = mouse.x - blob.cx, dy = mouse.y - blob.cy;
+                for (const p of blob.points) { p.x += dx * 0.05; p.y += dy * 0.05; }
+            }
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            if (currentTool === 'default' && !mouse.dragging) {
+                particles.push(new Particle(mouse.x, mouse.y));
+            } else if (currentTool === 'attractor') {
+                attractors.push(new Attractor(mouse.x, mouse.y));
+            } else if (currentTool === 'builder') {
+                if (currentSubtool === 'spike') spikes.push(new Spike(mouse.x, mouse.y));
+                else if (currentSubtool === 'wall' && wallStart) {
+                    const dx = mouse.x - wallStart.x, dy = mouse.y - wallStart.y;
+                    if (Math.sqrt(dx * dx + dy * dy) > 20) walls.push(new Wall(wallStart.x, wallStart.y, mouse.x, mouse.y));
+                }
+            }
+            mouse.down = false; mouse.dragging = false; wallStart = null;
+        });
+
+        // Auto-spawn particles
+        setInterval(() => {
+            const liveCount = particles.filter(p => !p.absorbed).length;
+            if (liveCount < 15) {
+                const edge = Math.floor(Math.random() * 4);
+                let x, y;
+                switch (edge) {
+                    case 0: x = Math.random() * W; y = -10; break;
+                    case 1: x = W + 10; y = Math.random() * H; break;
+                    case 2: x = Math.random() * W; y = H + 10; break;
+                    case 3: x = -10; y = Math.random() * H; break;
+                }
+                particles.push(new Particle(x, y));
+            }
+        }, 1500);
+
+        // ─── Main Loop ──────────────────────────────────────────────
+        const statsEl = document.getElementById('stats');
+        let frameCount = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            frameCount++;
+
+            drawBackground(ctx);
+
+            // Update particles
+            for (const p of particles) p.update();
+
+            // Update blob
+            blob.update(particles, 1);
+
+            // Update & apply attractors
+            for (const a of attractors) {
+                a.update();
+                a.affectBlob(blob);
+                for (const p of particles) { if (!p.absorbed) a.affect(p); }
+            }
+
+            // Apply walls
+            for (const w of walls) {
+                for (const bp of blob.points) w.collide(bp, 4);
+                for (const p of particles) { if (!p.absorbed) w.collide(p, p.radius); }
+            }
+
+
+
+            // Update & apply spikes
+            for (const s of spikes) {
+                s.update();
+                s.hitBlob(blob);
+                for (const p of particles) { if (!p.absorbed) s.hitParticle(p); }
+            }
+
+            // Draw order: walls → jump pads → spikes → tendrils → particles → attractors → blob → wall preview
+            for (const w of walls) w.draw(ctx);
+
+            for (const s of spikes) s.draw(ctx);
+            drawTendrils(ctx, blob, particles);
+            for (const p of particles) p.draw(ctx);
+            for (const a of attractors) a.draw(ctx);
+            blob.draw(ctx);
+
+            // Wall preview while dragging
+            if (wallStart && mouse.down && currentTool === 'builder' && currentSubtool === 'wall') {
+                ctx.beginPath();
+                ctx.moveTo(wallStart.x, wallStart.y);
+                ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = 'rgba(255, 200, 80, 0.3)';
+                ctx.lineWidth = 6;
+                ctx.lineCap = 'round';
+                ctx.setLineDash([8, 8]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Clean up
+            particles = particles.filter(p => !p.absorbed || p.absorbTime < 1);
+
+            // Stats
+            if (frameCount % 30 === 0) {
+                const liveCount = particles.filter(p => !p.absorbed).length;
+                const objCount = attractors.length + walls.length + spikes.length;
+                statsEl.textContent = `Particles: ${liveCount} · Absorbed: ${blob.absorbed} · Placed objects: ${objCount} · Blob: ${Math.round(blob.getEffectiveRadius())}px`;
+            }
+        }
+
+        animate();
+    </script>
+</body>
+
+</html>
